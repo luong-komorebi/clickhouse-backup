@@ -136,6 +136,86 @@ Pod Template Name
 {{- end }}
 
 {{/*
+Backup Pod Template Name
+*/}}
+{{- define "clickhouse.backupPodTemplateName" -}}
+{{- printf "%s-%s" (include "clickhouse.podTemplateName" .) (default .Values.clickhouse.backup.podTemplate.name "clickhouse-backup") | replace "+" "_" | trunc 63 | trimSuffix "-" }}
+{{- end }}
+
+{{/*
+Backup Pod Template Base
+This renders a pod template similar to the main podTemplateBase but adds
+the backup sidecar container and pod-level securityContext/annotations.
+*/}}
+{{- define "clickhouse.backupPodTemplateBase" -}}
+        metadata:
+          annotations:
+            {{- with .Values.clickhouse.podAnnotations }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+            {{- with .Values.clickhouse.backup.podTemplate.annotations }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          labels:
+            {{- include "clickhouse.labels" . | nindent 12 }}
+            {{- with .Values.clickhouse.podLabels }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+        podDistribution:
+          {{- include "clickhouse.podDistribution" . | nindent 10 }}
+        spec:
+          securityContext:
+            {{- toYaml .Values.clickhouse.backup.podTemplate.securityContext | nindent 12 }}
+          {{- with .Values.clickhouse.imagePullSecrets }}
+          imagePullSecrets:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- if or .Values.clickhouse.serviceAccount.create .Values.clickhouse.serviceAccount.name }}
+          serviceAccountName: {{ include "clickhouse.serviceAccountName" . }}
+          {{- end }}
+          containers:
+            - name: {{ .Chart.Name }}
+              securityContext:
+                {{- toYaml .Values.clickhouse.securityContext | nindent 16 }}
+              image: "{{ .Values.clickhouse.image.repository }}:{{ .Values.clickhouse.image.tag | default .Chart.AppVersion }}"
+              imagePullPolicy: {{ .Values.clickhouse.image.pullPolicy }}
+              resources:
+                {{- toYaml .Values.clickhouse.resources | nindent 16 }}
+            - name: {{ .Values.clickhouse.backup.podTemplate.sidecar.name }}
+              image: "{{ .Values.clickhouse.backup.podTemplate.sidecar.image }}"
+              imagePullPolicy: {{ .Values.clickhouse.backup.podTemplate.sidecar.imagePullPolicy }}
+              args:
+                {{- toYaml .Values.clickhouse.backup.podTemplate.sidecar.args | nindent 16 }}
+              env:
+                {{- with .Values.clickhouse.backup.podTemplate.sidecar.env }}
+                {{- range $key, $val := . }}
+                - name: {{ $key }}
+                  value: {{ $val | quote }}
+                {{- end }}
+                {{- end }}
+              ports:
+                {{- with .Values.clickhouse.backup.podTemplate.sidecar.ports }}
+                {{- toYaml . | nindent 16 }}
+                {{- end }}
+          {{- with .Values.clickhouse.nodeSelector }}
+          nodeSelector:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.clickhouse.affinity }}
+          affinity:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.clickhouse.tolerations }}
+          tolerations:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with .Values.clickhouse.topologySpreadConstraints }}
+          topologySpreadConstraints:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end -}}
+
+{{/*
 Service Template Name
 */}}
 {{- define "clickhouse.serviceTemplateName" -}}

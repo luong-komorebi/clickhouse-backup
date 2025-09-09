@@ -132,6 +132,64 @@ clickhouse:
     <clickhouse>
     </clickhouse>
 
+  # -- Backup sidecar and cronjob configuration
+  backup:
+    enabled: false
+    # When true, a podTemplate with the backup sidecar will be added to the CHI templates
+    podTemplate:
+      # name suffix for the podTemplate (full name will be generated automatically)
+      name: "clickhouse-backup"
+      # Pod security context applied to the podTemplate
+      securityContext:
+        runAsUser: 101
+        runAsGroup: 101
+        fsGroup: 101
+      # Sidecar container image and settings
+      sidecar:
+        name: clickhouse-backup
+        image: altinity/clickhouse-backup:latest
+        imagePullPolicy: Always
+        args:
+          - server
+        env:
+          LOG_LEVEL: "debug"
+          ALLOW_EMPTY_BACKUPS: "true"
+          API_LISTEN: "0.0.0.0:7171"
+          API_CREATE_INTEGRATION_TABLES: "true"
+          BACKUPS_TO_KEEP_REMOTE: "3"
+          REMOTE_STORAGE: "s3"
+          S3_ACL: "private"
+          S3_ENDPOINT: "http://s3-backup-minio:9000"
+          S3_REGION: us-east-1
+          S3_BUCKET: clickhouse
+          S3_PATH: "backup/shard-{shard}"
+          S3_ACCESS_KEY: backup-access-key
+          S3_SECRET_KEY: backup-secret-key
+          S3_FORCE_PATH_STYLE: "true"
+          S3_DISABLE_SSL: "true"
+          S3_DEBUG: "true"
+        ports:
+          - name: backup-rest
+            containerPort: 7171
+    # CronJob configuration for scheduled backups
+    cronjob:
+      enabled: false
+      name: clickhouse-backup-cron
+      # default: every day at 00:00
+      schedule: "0 0 * * *"
+      concurrencyPolicy: Forbid
+      # image for the job run (uses clickhouse server image which includes client)
+      image: clickhouse/clickhouse-server:latest
+      imagePullPolicy: IfNotPresent
+      # env values passed to the backup runner container (map of name=>value)
+      env:
+        CLICKHOUSE_SERVICES: ""
+        CLICKHOUSE_PORT: "9000"
+        BACKUP_USER: backup
+        BACKUP_PASSWORD: "backup_password"
+        MAKE_INCREMENT_BACKUP: "1"
+        FULL_BACKUP_WEEKDAY: "1"
+
   # -- Init scripts ConfigMap configuration
   initScripts:
     # -- Set to true to enable init scripts feature

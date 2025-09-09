@@ -24,6 +24,10 @@ spec:
     podTemplates:
       - name: {{ include "clickhouse.podTemplateName" . }}
         {{ include "clickhouse.podTemplateBase" . }}
+      {{- if .Values.clickhouse.backup.enabled }}
+      - name: {{ include "clickhouse.backupPodTemplateName" . }}
+        {{ include "clickhouse.backupPodTemplateBase" . }}
+      {{- end }}
       {{- if not (empty .Values.clickhouse.zones) -}}
       {{- $originalContext := . -}}
       {{- range .Values.clickhouse.zones }}
